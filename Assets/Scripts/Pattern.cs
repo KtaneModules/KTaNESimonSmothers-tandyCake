@@ -128,9 +128,34 @@ public class Pattern : IEnumerable<Coordinate>, IEquatable<Pattern>
 
     public bool IsPaintable()
     {
-        return true;
+        Dictionary<int, List<Coordinate>> groups = new Dictionary<int, List<Coordinate>>();
+        foreach (Coordinate coord in this)
+        {
+            if (!groups.ContainsKey(coord.tileValue))
+                groups.Add(coord.tileValue, new List<Coordinate>() { coord });
+            else groups[coord.tileValue].Add(coord);
+        }
+        return this.Any(x => _IsPaintableFromCoord(x, groups));
+    }
+    private bool _IsPaintableFromCoord(Coordinate position, Dictionary<int, List<Coordinate>> groups)
+    {
+        if (!this.Contains(position))
+            throw new ArgumentException();
+        Coordinate current = position.Copy();
+        List<Coordinate> coordsWeCanGoTo = _GetAdjacentsInPattern(current).Where(x => x.tileValue == position.tileValue).ToList();
+        do
+        {
+            int currentPaint = position.tileValue;
+            groups[currentPaint].Remove(position);
+            List<Coordinate> adjacents = _GetAdjacentsInPattern(current).ToList();
+            
+        } while (true);
     }
 
+    private IEnumerable<Coordinate> _GetAdjacentsInPattern(Coordinate c)
+    {
+        return c.GetAdjacents().Where(x => this.Contains(x));
+    }
     public override string ToString()
     {
         return this.Join(", ");

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;  
 using UnityEngine;
 
 public class Coordinate : IEquatable<Coordinate>
@@ -43,7 +44,10 @@ public class Coordinate : IEquatable<Coordinate>
         return new Coordinate(x, y, tileValue);
     }
 
-
+    public IEnumerable<Coordinate> GetAdjacents()
+    {
+        return Enumerable.Range(0, 4).Select(x => ApplyMovement((Dir)x));
+    }
     public override string ToString()
     {
         return string.Format("({0},{1} with value {2})", x, y, tileValue);
