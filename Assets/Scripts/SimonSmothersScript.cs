@@ -14,9 +14,7 @@ public class SimonSmothersScript : MonoBehaviour {
     public KMBombModule Module;
 
     public Light bigLight;
-    private static Light _usedLight;
     private static Coroutine _bigFlashCoroutine;
-    private static Light[] _allLights;
     private static bool anyActive;
     private bool thisActive;
 
@@ -26,7 +24,8 @@ public class SimonSmothersScript : MonoBehaviour {
 
     private int stage;
     private bool pressedSubmitAlready;
-    private int currentPaintColor;
+    List<int> buttonSounds = Enumerable.Range(1,4).ToList();
+    int submitSound;
 
     private Pattern generatedPattern, inputtedPattern;
     private List<Flash> flashes = new List<Flash>();
@@ -67,29 +66,27 @@ public class SimonSmothersScript : MonoBehaviour {
 
     void Start ()
     {
-        StartCoroutine(DetermineLight());
         for (int i = 0; i < 5; i++)
             dirLights[i].range *= transform.lossyScale.x;
-        
+        bigLight.range *= transform.lossyScale.x;
+        buttonSounds.Shuffle();
+        buttonSounds.Add(Rnd.Range(1, 5));
     }
 
     void ButtonPress(int position)
     {
         buttons[position].AddInteractionPunch(0.25f);
-        if (thisActive || position == 4)
-        {
-            if (buttonCoroutines[position] != null)
-                StopCoroutine(buttonCoroutines[position]);
-            buttonCoroutines[position] = StartCoroutine(FlashLight(dirLights[position], 0.33f));
-            //Audio.PlaySoundAtTransform("808bruhhhhhhhhhhhhhhhhhhhhhh", buttons[position].transform);
-        }
+        if (buttonCoroutines[position] != null)
+            StopCoroutine(buttonCoroutines[position]);
+        buttonCoroutines[position] = StartCoroutine(FlashLight(dirLights[position], 0.33f, true));
+        Audio.PlaySoundAtTransform("Sound" + buttonSounds[position], buttons[position].transform);
+        if (moduleSolved)
+            return;
 
         if (position == 4)
             HandleSubmit();
         else
-        {
             HandleDirectionPress((Dir)position);
-        }
         
     }
 
@@ -112,14 +109,17 @@ public class SimonSmothersScript : MonoBehaviour {
         }
         else if (pressedSubmitAlready)
         {
-            if (generatedPattern.Equals(inputtedPattern))
+            pressedSubmitAlready = false;
+            if (generatedPattern.IsEquivalentPattern(inputtedPattern))
             {
-                if (stage == 3)
-                    Module.HandlePass();
+                if (stage == 4)
+                    StartCoroutine(Solve());
                 else
                 {
+                    Audio.PlaySoundAtTransform("Pass", transform);
                     _bigFlashCoroutine = StartCoroutine(FlashThisStage());
                     GenerateStage();
+                    inputtedPattern = Pattern.center;
                 }
 
             }
@@ -127,24 +127,43 @@ public class SimonSmothersScript : MonoBehaviour {
             {
                 Log("Inputted the following pattern, which is incorrect:");
                 LogPattern(inputtedPattern, false);
-                Module.HandleStrike();
+                Strike();
             }
-            inputtedPattern = Pattern.center;
         }
         else
         {
-            currentPaintColor++;
             pressedSubmitAlready = true;
-
             if (_bigFlashCoroutine != null)
                 StopCoroutine(_bigFlashCoroutine);
         }
+    }
+    IEnumerator Solve()
+    {
+        Audio.PlaySoundAtTransform("Solve", transform);
+        moduleSolved = true;
+        anyActive = false;
+        yield return new WaitForSecondsRealtime(3.456f);
+        Audio.PlayGameSoundAtTransform(KMSoundOverride.SoundEffect.CorrectChime, transform);
+        Module.HandlePass();
+    }
+    void Strike()
+    {
+        Module.HandleStrike();
+        pressedSubmitAlready = false;
+        _bigFlashCoroutine = StartCoroutine(FlashThisStage());
+        inputtedPattern = Pattern.center;
     }
     void HandleDirectionPress(Dir pressedDir)
     {
         if (!thisActive)
             return;
         StopBigFlash();
+
+        if (!inputtedPattern.AddInDir(pressedDir, pressedSubmitAlready))
+        {
+            Log("Attempted to move onto a cell already painted. Strike!");
+            Strike();
+        }
         pressedSubmitAlready = false;
     }
     void GenerateStage()
@@ -155,7 +174,7 @@ public class SimonSmothersScript : MonoBehaviour {
         {
             generatedFlash = new Flash((Dir)Rnd.Range(0, 4), 
                                 (RGBColor)Rnd.Range(1, 7), 
-                                sideLengths[Bomb.GetSerialNumberNumbers().Last() % 5][stage]);
+                                sideLengths[Bomb.GetSerialNumberNumbers().First() % 5][stage]);
             p = new Pattern();
             List<Flash> newFlashes = flashes.ToList();
             newFlashes.Add(generatedFlash);
@@ -178,7 +197,7 @@ public class SimonSmothersScript : MonoBehaviour {
     {
         Log("Added flash {0}.", flashes.Last());
         Log("Total flashes: {0}.", flashes.Join(", "));
-        Log("Added a {0}x{0} square in color {1} in the center of the grid, and then moved in the directions: {2}.",
+        Log("Added a {0}×{0} square in color {1} in the center of the grid, and then moved in the directions: {2}.",
              sideLengths[Bomb.GetSerialNumberNumbers().Last() % 5][flashes.Count - 1],
              flashes.Last().color,
              RotateDirections(flashes.Select(x => x.direction), flashes.Count - 1).Join(", "));
@@ -188,7 +207,7 @@ public class SimonSmothersScript : MonoBehaviour {
 
     void StopBigFlash()
     {
-        _usedLight.enabled = false;
+        bigLight.enabled = false;
         if (_bigFlashCoroutine != null)
             StopCoroutine(_bigFlashCoroutine);
     }
@@ -198,42 +217,33 @@ public class SimonSmothersScript : MonoBehaviour {
         return initial.Select(d => (Dir)(((int)d + rotationNum) % 4));
     }
 
-    IEnumerator FlashLight(Light light, float time)
+    IEnumerator FlashLight(Light light, float time, bool isButton, RGBColor? used = null)
     {
         light.enabled = true;
+        light.gameObject.SetActive(true);
+        light.intensity = (used == RGBColor.Cyan || used == RGBColor.Magenta || used == RGBColor.Yellow) ? 0.3f : 0.5f;
         yield return new WaitForSeconds(time);
+        if (isButton)
+            light.gameObject.SetActive(false);
         light.enabled = false;
     }
     IEnumerator FlashThisStage()
     {
-        Debug.Log("STARTR");
         while (true)
         {
             yield return new WaitForSeconds(2);
             for (int stage = 0; stage < flashes.Count; stage++)
             {
-                _usedLight.color = colorLookup[flashes[stage].color];
-                StartCoroutine(FlashLight(_usedLight, 0.75f));
-                StartCoroutine(FlashLight(dirLights[(int)flashes[stage].direction], 0.75f));
+                bigLight.color = colorLookup[flashes[stage].color];
+                StartCoroutine(FlashLight(bigLight, 0.75f, false, flashes[stage].color));
+                StartCoroutine(FlashLight(dirLights[(int)flashes[stage].direction], 0.75f, true));
+                Audio.PlaySoundAtTransform("Sound" + ((int)flashes[stage].direction + 1), transform);
                 yield return new WaitForSeconds(1f);
             }
 
         }
     }
 
-    IEnumerator DetermineLight()
-    {
-        yield return null;
-        _allLights = FindObjectsOfType<SimonSmothersScript>().Select(x => x.bigLight).ToArray();
-        Light closestLight = _allLights.OrderBy(L => Vector3.Distance(L.transform.position, Vector3.zero)).First();
-        if (bigLight == closestLight)
-        {
-            Debug.LogFormat("<Simon Smothers> Keeping closest light to origin here at module ID {0}.", moduleId);
-            _usedLight = closestLight;
-        }
-        else
-            Destroy(bigLight.gameObject);
-    }
     void OnDestroy()
     { anyActive = false; }
 
@@ -245,21 +255,33 @@ public class SimonSmothersScript : MonoBehaviour {
     {
         foreach (string line in pattern.GetLoggingPattern(usingColors))
             Log(line);
+        Log(pattern.GetLoggingDifferences());
     }
 
 #pragma warning disable 414
-    private readonly string TwitchHelpMessage = @"Use <!{0} foobar> to do something.";
+    private readonly string TwitchHelpMessage = @"Use <!{0} URDLS> to press the up, right, down, left, then submit button.";
     #pragma warning restore 414
 
+    IEnumerator Press(KMSelectable btn, float delay)
+    {
+        btn.OnInteract();
+        yield return new WaitForSeconds(delay);
+    }
     IEnumerator ProcessTwitchCommand (string command)
     {
         command = command.Trim().ToUpperInvariant();
-        List<string> parameters = command.Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries).ToList();
-        yield return null;
+        Match m = Regex.Match(command, @"^(?:(?:PRESS|SUBMIT|MOVE|P|M)\s+)?([URDLS]+)$");
+        if (m.Success)
+        {
+            yield return null;
+            foreach (char ch in m.Groups[1].Value)
+            {
+                buttons["URDLS".IndexOf(ch)].OnInteract();
+                yield return new WaitForSeconds(0.2f);
+            }
+            if (moduleSolved)
+                yield return "solve";
+        }
     }
 
-    IEnumerator TwitchHandleForcedSolve ()
-    {
-        yield return null;
-    }
 }

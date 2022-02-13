@@ -4,17 +4,20 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 
-public class Pattern : IEnumerable<Coordinate>, IEquatable<Pattern>
+public class Pattern : IEnumerable<Coordinate>
 {
 
     private List<Coordinate> _coords = new List<Coordinate>();
-    public static readonly Pattern center = new Pattern { _coords = new List<Coordinate> { new Coordinate(0, 0, 0) } };
+    private List<CoordinateDifference> _differences = new List<CoordinateDifference>();
+    public static Pattern center { get { return new Pattern { _coords = new List<Coordinate> { new Coordinate(0, 0, 0) } }; } }
 
     public Pattern() { }
-    public Pattern(IEnumerable<Coordinate> coords)
+    public Pattern(IEnumerable<Coordinate> coords, List<CoordinateDifference> diffs = null)
     {
         _coords = coords.ToList();
+        _differences = diffs ?? new List<CoordinateDifference>();
     }
+
 
     public void Add(Coordinate c)
     {
@@ -28,21 +31,23 @@ public class Pattern : IEnumerable<Coordinate>, IEquatable<Pattern>
         _coords.AddRange(coords);
         _CheckXOR();
     }
-    public bool AddInDir(Dir direction, int newValue)
+    public bool AddInDir(Dir direction, int newValue, bool diff)
     {
-        Coordinate c = _coords.Last().ApplyMovement(direction);
-        c.tileValue = newValue;
-        if (_coords.Contains(c))
+        Coordinate prev = _coords.Last();
+        Coordinate next = prev.ApplyMovement(direction);
+        next.tileValue = newValue;
+        if (_coords.Contains(next))
             return false;
         else
         {
-            _coords.Add(c);
+            _coords.Add(next);
+            _differences.Add(new CoordinateDifference(prev, next, diff));
             return true;
         }
     }
-    public bool AddInDir(Dir direction)
+    public bool AddInDir(Dir direction, bool diff)
     {
-        return AddInDir(direction, _coords.Last().tileValue);
+        return AddInDir(direction, _coords.Last().tileValue, diff);
     }
 
 
@@ -60,42 +65,30 @@ public class Pattern : IEnumerable<Coordinate>, IEquatable<Pattern>
         }
         _coords = new List<Coordinate>(placed);
     }
-
-    private Pattern _NormalizePosition(Pattern p)
+    public Pattern Normalize()
     {
         if (_coords.Count == 0)
             return this;
         Pattern output = new Pattern();
-        int minX = p._coords.Min(coord => coord.x);
-        int minY = p._coords.Min(coord => coord.y);
+        List<CoordinateDifference> diffs = new List<CoordinateDifference>();
 
-        foreach (Coordinate coord in p)
+        int minX = _coords.Min(coord => coord.x);
+        int minY = _coords.Min(coord => coord.y);
+
+        foreach (Coordinate coord in this)
         {
             Coordinate newCoord = coord.Copy();
             newCoord.x -= minX;
             newCoord.y -= minY;
             output.Add(newCoord);
         }
+        foreach (CoordinateDifference d in _differences)
+            diffs.Add(new CoordinateDifference(
+                new Coordinate(d.a.x - minX, d.a.y - minY), 
+                new Coordinate(d.b.x - minX, d.b.y - minY), 
+                d.isDiff));
         IEnumerable<Coordinate> coords = output.OrderBy(coord => coord.x).ThenBy(coord => coord.y);
-        return new Pattern(coords);
-    }
-    private Pattern _NormalizeColors(Pattern p)
-    {
-        if (_coords.Count == 0)
-            return this;
-        int[] allNums = p._coords.Select(x => x.tileValue)
-                               .Distinct().OrderBy(x => x).ToArray();
-        Dictionary<int, int> tableLookup = Enumerable.Range(0, allNums.Count()).ToDictionary(x => allNums[x]);
-
-        Pattern output = new Pattern();
-        foreach (Coordinate coord in p)
-            output.Add(new Coordinate(coord.x, coord.y, tableLookup[coord.tileValue]));
-        return output;
-    }
-
-    public Pattern Normalize()
-    {
-        return _NormalizeColors(_NormalizePosition(this));
+        return new Pattern(coords, diffs);
     }
     private char _GetRGBChar(int value)
     {
@@ -106,7 +99,7 @@ public class Pattern : IEnumerable<Coordinate>, IEquatable<Pattern>
     {
         if (_coords.Count == 0)
             yield break;
-        Pattern p = _NormalizePosition(this);
+        Pattern p = Normalize();
         int width = p.Max(crd => crd.x) + 1;
         int height = p.Max(crd => crd.y) + 1;
 
@@ -118,38 +111,58 @@ public class Pattern : IEnumerable<Coordinate>, IEquatable<Pattern>
             {
                 if (line.Any(crd => crd.x == x))
                     loggingLine += usingColors ?
-                                     _GetRGBChar(line.First(crd => crd.x == x).tileValue) :
-                                     ((char)(line.First(crd => crd.x == x).tileValue + 'A'));
+                                     _GetRGBChar(line.First(crd => crd.x == x).tileValue) : 'x';
                 else loggingLine += '.';
             }
             yield return loggingLine;
         }
     }
+    public string GetLoggingDifferences()
+    {
+        return _differences.Select(d => string.Format("{0} {2}= {1}", d.a, d.b, d.isDiff ? "!" : "=")).Join(" | ");
+    }
 
     public bool IsPaintable()
     {
-        Dictionary<int, List<Coordinate>> groups = new Dictionary<int, List<Coordinate>>();
-        foreach (Coordinate coord in this)
-        {
-            if (!groups.ContainsKey(coord.tileValue))
-                groups.Add(coord.tileValue, new List<Coordinate>() { coord });
-            else groups[coord.tileValue].Add(coord);
-        }
-        return this.Any(x => _IsPaintableFromCoord(x, groups));
+        List<Coordinate> coords = this.ToList();
+        foreach (Coordinate c in coords)
+            if (_IsPaintableFrom(coords.ToList(), c))
+                return true;
+        return false;
     }
-    private bool _IsPaintableFromCoord(Coordinate position, Dictionary<int, List<Coordinate>> groups)
+    private bool _IsPaintableFrom(List<Coordinate> coords, Coordinate start)
     {
-        if (!this.Contains(position))
-            throw new ArgumentException();
-        Coordinate current = position.Copy();
-        List<Coordinate> coordsWeCanGoTo = _GetAdjacentsInPattern(current).Where(x => x.tileValue == position.tileValue).ToList();
-        do
+        coords.Remove(start);
+        if (coords.Count == 0)
+            return true;
+        List<Coordinate> next = new List<Coordinate>();
+        for (int i = 0; i < 4; i++)
+            if (coords.Contains(start.ApplyMovement((Dir)i)))
+                next.Add(start.ApplyMovement((Dir)i));
+        foreach (Coordinate coordinate in next)
+            if (_IsPaintableFrom(coords.ToList(), coordinate))
+                return true;
+        return false;
+    }
+
+    public bool IsEquivalentPattern(Pattern other)
+    {
+        Pattern normThis = Normalize(), normOther = other.Normalize();
+        if (this.Count() != other.Count())
+            return false;
+        foreach (Coordinate coordinate in normOther)
+            if (!normOther.Contains(coordinate))
+                return false;
+        foreach (CoordinateDifference difference in normOther._differences)
         {
-            int currentPaint = position.tileValue;
-            groups[currentPaint].Remove(position);
-            List<Coordinate> adjacents = _GetAdjacentsInPattern(current).ToList();
-            
-        } while (true);
+            int valA = normThis.First(x => x.Equals(difference.a)).tileValue;
+            int valB = normThis.First(x => x.Equals(difference.b)).tileValue;
+            if (difference.isDiff && valA == valB)
+                return false;
+            if (!difference.isDiff && valA != valB)
+                return false;
+        }
+        return true;
     }
 
     private IEnumerable<Coordinate> _GetAdjacentsInPattern(Coordinate c)
@@ -159,21 +172,6 @@ public class Pattern : IEnumerable<Coordinate>, IEquatable<Pattern>
     public override string ToString()
     {
         return this.Join(", ");
-    }
-    public override bool Equals(object obj)
-    {
-        return obj is Pattern && Equals(obj as Pattern);
-    }
-    public bool Equals(Pattern other)
-    {
-        return this.Count() == other.Count() && this.Normalize().SequenceEqual(other.Normalize());
-    }
-    public override int GetHashCode()
-    {
-        int output = 0;
-        foreach (Coordinate coord in this)
-            output ^= coord.GetHashCode();
-        return output;
     }
     public IEnumerator<Coordinate> GetEnumerator()
         { return _coords.GetEnumerator(); }

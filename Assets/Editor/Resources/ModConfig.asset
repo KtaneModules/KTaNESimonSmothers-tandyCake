@@ -14,7 +14,7 @@ MonoBehaviour:
   id: simonSmothers
   title: Simon Smothers
   author: Danny7007
-  description: 'What do you mean you think I misread the color? EVERYTHING IS BLUE!
+  description: 'What do you mean you think I misread the color? Eveyrthing is blue!
 
 
     Module by Danny7007
@@ -24,4 +24,4 @@ MonoBehaviour:
     Manual can be found at ktane.timwi.de'
   version: 1.0.0
   outputFolder: build
-  previewImage: {fileID: 0}
+  previewImage: {fileID: 2800000, guid: ffad9c9d41fc4684a82eb2b4f8c43f9a, type: 3}

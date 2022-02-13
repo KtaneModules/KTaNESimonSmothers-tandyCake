@@ -6,6 +6,7 @@ public enum Dir
     Down,
     Left,
 }
+
 [Flags]
 public enum RGBColor
 {

@@ -10,7 +10,7 @@ public class Coordinate : IEquatable<Coordinate>
     public int y;
     public int tileValue;
 
-    public Coordinate(int x, int y, int v)
+    public Coordinate(int x, int y, int v = 0)
     {
         this.x = x;
         this.y = y;
@@ -50,7 +50,7 @@ public class Coordinate : IEquatable<Coordinate>
     }
     public override string ToString()
     {
-        return string.Format("({0},{1} with value {2})", x, y, tileValue);
+        return string.Format("({0},{1})", x, y);
     }
     public override bool Equals(object obj)
     {
