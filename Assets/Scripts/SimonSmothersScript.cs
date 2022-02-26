@@ -255,7 +255,11 @@ public class SimonSmothersScript : MonoBehaviour {
     {
         foreach (string line in pattern.GetLoggingPattern(usingColors))
             Log(line);
-        Log(pattern.GetLoggingDifferences());
+        if (!usingColors)
+        {
+            Log("The submitted tile differences are as follows: (Coordinates are column, then row; top-left is (0,0))");
+            Log(pattern.GetLoggingDifferences());
+        }
     }
 
 #pragma warning disable 414

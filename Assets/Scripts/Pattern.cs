@@ -92,7 +92,8 @@ public class Pattern : IEnumerable<Coordinate>
     }
     private char _GetRGBChar(int value)
     {
-        return value > 7 ? ((char)(value - 8 + '0')) : ((RGBColor)value).ToString()[0];
+        RGBColor c = (RGBColor)value;
+        return c == RGBColor.Black ? 'K' : c.ToString()[0];
     }
 
     public IEnumerable<string> GetLoggingPattern(bool usingColors)
@@ -119,7 +120,8 @@ public class Pattern : IEnumerable<Coordinate>
     }
     public string GetLoggingDifferences()
     {
-        return _differences.Select(d => string.Format("{0} {2}= {1}", d.a, d.b, d.isDiff ? "!" : "=")).Join(" | ");
+        Pattern norm = this.Normalize();
+        return norm._differences.Where(d => d.isDiff).Select(d => string.Format("{0} != {1}", d.a, d.b)).Join(" / ");
     }
 
     public bool IsPaintable()
@@ -155,6 +157,8 @@ public class Pattern : IEnumerable<Coordinate>
                 return false;
         foreach (CoordinateDifference difference in normOther._differences)
         {
+            if (!normThis.Contains(difference.a) || !normThis.Contains(difference.b))
+                return false;
             int valA = normThis.First(x => x.Equals(difference.a)).tileValue;
             int valB = normThis.First(x => x.Equals(difference.b)).tileValue;
             if (difference.isDiff && valA == valB)
