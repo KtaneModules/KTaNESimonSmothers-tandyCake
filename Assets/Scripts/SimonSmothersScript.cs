@@ -12,11 +12,14 @@ public class SimonSmothersScript : MonoBehaviour {
     public KMBombInfo Bomb;
     public KMAudio Audio;
     public KMBombModule Module;
+    public KMColorblindMode Colorblind;
 
     public Light bigLight;
+    public TextMesh goofyAhhText;
     private static Coroutine _bigFlashCoroutine;
     private static bool anyActive;
     private bool thisActive;
+    private bool cbOn;
 
     public KMSelectable[] buttons; //buttons[4] is the submit button
     public Light[] dirLights;
@@ -71,6 +74,8 @@ public class SimonSmothersScript : MonoBehaviour {
         bigLight.range *= transform.lossyScale.x;
         buttonSounds.Shuffle();
         buttonSounds.Add(Rnd.Range(1, 5));
+        if (Colorblind.ColorblindModeActive)
+            ToggleCB();
     }
 
     void ButtonPress(int position)
@@ -236,12 +241,35 @@ public class SimonSmothersScript : MonoBehaviour {
             {
                 bigLight.color = colorLookup[flashes[stage].color];
                 StartCoroutine(FlashLight(bigLight, 0.75f, false, flashes[stage].color));
+                goofyAhhText.text = flashes[stage].color.ToString().ToUpper() + "!";
                 StartCoroutine(FlashLight(dirLights[(int)flashes[stage].direction], 0.75f, true));
+                StartCoroutine(Spiral(0.75f));
                 Audio.PlaySoundAtTransform("Sound" + ((int)flashes[stage].direction + 1), transform);
                 yield return new WaitForSeconds(1f);
             }
 
         }
+    }
+    IEnumerator Spiral(float duration)
+    {
+        goofyAhhText.transform.localEulerAngles = new Vector3(90, Rnd.Range(0f, 360), 0);
+        float delta = 0;
+        while (delta < 1)
+        {
+            yield return null;
+            goofyAhhText.transform.localScale = Vector3.Lerp(Vector3.zero, new Vector3(4, 4, 1), delta);
+            goofyAhhText.transform.localEulerAngles += 210 * Time.deltaTime * Vector3.up;
+            delta += Time.deltaTime / duration;
+        }
+        delta = 0;
+        while (delta < 1)
+        {
+            yield return null;
+            goofyAhhText.transform.localScale = goofyAhhText.transform.localScale = Vector3.Lerp(new Vector3(4, 4, 1), Vector3.zero, delta);
+            goofyAhhText.transform.localEulerAngles += 210 * Time.deltaTime * Vector3.up;
+            delta += Time.deltaTime / .25f;
+        }
+        goofyAhhText.transform.localScale = Vector3.zero;
     }
 
     void OnDestroy()
@@ -261,9 +289,14 @@ public class SimonSmothersScript : MonoBehaviour {
             Log(pattern.GetLoggingDifferences());
         }
     }
+    void ToggleCB()
+    {
+        cbOn = !cbOn;
+        goofyAhhText.gameObject.SetActive(cbOn);
+    }
 
 #pragma warning disable 414
-    private readonly string TwitchHelpMessage = @"Use <!{0} URDLS> to press the up, right, down, left, then submit button.";
+    private readonly string TwitchHelpMessage = @"Use <!{0} URDLS> to press the up, right, down, left, then submit button. Use <!{0} colorblind> to toggle colorblind mode.";
     #pragma warning restore 414
 
     IEnumerator Press(KMSelectable btn, float delay)
@@ -274,6 +307,11 @@ public class SimonSmothersScript : MonoBehaviour {
     IEnumerator ProcessTwitchCommand (string command)
     {
         command = command.Trim().ToUpperInvariant();
+        if (command.EqualsAny("COLORBLIND", "COLOURBLIND", "COLOR-BLIND", "COLOUR-BLIND", "CB"))
+        {
+            yield return null;
+            ToggleCB();
+        }
         Match m = Regex.Match(command, @"^(?:(?:PRESS|SUBMIT|MOVE|P|M)\s+)?([URDLS]+)$");
         if (m.Success)
         {
