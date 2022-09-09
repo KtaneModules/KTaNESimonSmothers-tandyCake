@@ -239,37 +239,24 @@ public class SimonSmothersScript : MonoBehaviour {
             yield return new WaitForSeconds(2);
             for (int stage = 0; stage < flashes.Count; stage++)
             {
+
                 bigLight.color = colorLookup[flashes[stage].color];
                 StartCoroutine(FlashLight(bigLight, 0.75f, false, flashes[stage].color));
                 goofyAhhText.text = flashes[stage].color.ToString().ToUpper() + "!";
                 StartCoroutine(FlashLight(dirLights[(int)flashes[stage].direction], 0.75f, true));
-                StartCoroutine(Spiral(0.75f));
+                if (cbOn)
+                    StartCoroutine(FlashCBText(0.75f));
                 Audio.PlaySoundAtTransform("Sound" + ((int)flashes[stage].direction + 1), transform);
                 yield return new WaitForSeconds(1f);
             }
 
         }
     }
-    IEnumerator Spiral(float duration)
+    IEnumerator FlashCBText(float d)
     {
-        goofyAhhText.transform.localEulerAngles = new Vector3(90, Rnd.Range(0f, 360), 0);
-        float delta = 0;
-        while (delta < 1)
-        {
-            yield return null;
-            goofyAhhText.transform.localScale = Vector3.Lerp(Vector3.zero, new Vector3(4, 4, 1), delta);
-            goofyAhhText.transform.localEulerAngles += 210 * Time.deltaTime * Vector3.up;
-            delta += Time.deltaTime / duration;
-        }
-        delta = 0;
-        while (delta < 1)
-        {
-            yield return null;
-            goofyAhhText.transform.localScale = goofyAhhText.transform.localScale = Vector3.Lerp(new Vector3(4, 4, 1), Vector3.zero, delta);
-            goofyAhhText.transform.localEulerAngles += 210 * Time.deltaTime * Vector3.up;
-            delta += Time.deltaTime / .25f;
-        }
-        goofyAhhText.transform.localScale = Vector3.zero;
+        goofyAhhText.gameObject.SetActive(true);
+        yield return new WaitForSeconds(d);
+        goofyAhhText.gameObject.SetActive(false);
     }
 
     void OnDestroy()

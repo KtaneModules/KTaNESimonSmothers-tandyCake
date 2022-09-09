@@ -13,15 +13,15 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   id: simonSmothers
   title: Simon Smothers
-  author: Danny7007
+  author: tandyCake
   description: 'What do you mean you think I misread the color? Eveyrthing is blue!
 
 
-    Module by Danny7007
+    Module by tandyCake
 
     moduleID: simonSmothers
 
     Manual can be found at ktane.timwi.de'
-  version: 1.2.0
+  version: 1.2.1
   outputFolder: build
   previewImage: {fileID: 2800000, guid: ffad9c9d41fc4684a82eb2b4f8c43f9a, type: 3}
