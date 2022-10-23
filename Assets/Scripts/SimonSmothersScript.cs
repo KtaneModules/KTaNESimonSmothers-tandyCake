@@ -203,7 +203,7 @@ public class SimonSmothersScript : MonoBehaviour {
         Log("Added flash {0}.", flashes.Last());
         Log("Total flashes: {0}.", flashes.Join(", "));
         Log("Added a {0}×{0} square in color {1} in the center of the grid, and then moved in the directions: {2}.",
-             sideLengths[Bomb.GetSerialNumberNumbers().Last() % 5][flashes.Count - 1],
+             sideLengths[Bomb.GetSerialNumberNumbers().First() % 5][flashes.Count - 1],
              flashes.Last().color,
              RotateDirections(flashes.Select(x => x.direction), flashes.Count - 1).Join(", "));
         Log("The generated pattern is as follows:");
