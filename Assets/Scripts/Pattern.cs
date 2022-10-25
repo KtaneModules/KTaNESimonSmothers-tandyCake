@@ -1,12 +1,9 @@
-﻿using System;
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using UnityEngine;
 
 public class Pattern : IEnumerable<Coordinate>
 {
-
     private List<Coordinate> _coords = new List<Coordinate>();
     private List<CoordinateDifference> _differences = new List<CoordinateDifference>();
     public static Pattern center { get { return new Pattern { _coords = new List<Coordinate> { new Coordinate(0, 0, 0) } }; } }
@@ -17,7 +14,6 @@ public class Pattern : IEnumerable<Coordinate>
         _coords = coords.ToList();
         _differences = diffs ?? new List<CoordinateDifference>();
     }
-
 
     public void Add(Coordinate c)
     {
@@ -84,15 +80,15 @@ public class Pattern : IEnumerable<Coordinate>
         }
         foreach (CoordinateDifference d in _differences)
             diffs.Add(new CoordinateDifference(
-                new Coordinate(d.a.x - minX, d.a.y - minY), 
-                new Coordinate(d.b.x - minX, d.b.y - minY), 
+                new Coordinate(d.a.x - minX, d.a.y - minY),
+                new Coordinate(d.b.x - minX, d.b.y - minY),
                 d.isDiff));
         IEnumerable<Coordinate> coords = output.OrderBy(coord => coord.x).ThenBy(coord => coord.y);
         return new Pattern(coords, diffs);
     }
     private char _GetRGBChar(int value)
     {
-        RGBColor c = (RGBColor)value;
+        RGBColor c = (RGBColor) value;
         return c == RGBColor.Black ? 'K' : c.ToString()[0];
     }
 
@@ -139,8 +135,8 @@ public class Pattern : IEnumerable<Coordinate>
             return true;
         List<Coordinate> next = new List<Coordinate>();
         for (int i = 0; i < 4; i++)
-            if (coords.Contains(start.ApplyMovement((Dir)i)))
-                next.Add(start.ApplyMovement((Dir)i));
+            if (coords.Contains(start.ApplyMovement((Dir) i)))
+                next.Add(start.ApplyMovement((Dir) i));
         foreach (Coordinate coordinate in next)
             if (_IsPaintableFrom(coords.ToList(), coordinate))
                 return true;
@@ -178,8 +174,8 @@ public class Pattern : IEnumerable<Coordinate>
         return this.Join(", ");
     }
     public IEnumerator<Coordinate> GetEnumerator()
-        { return _coords.GetEnumerator(); }
+    { return _coords.GetEnumerator(); }
     IEnumerator IEnumerable.GetEnumerator()
-        { return GetEnumerator(); }
+    { return GetEnumerator(); }
 
 }

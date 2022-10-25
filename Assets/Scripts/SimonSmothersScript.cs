@@ -7,7 +7,8 @@ using UnityEngine;
 using KModkit;
 using Rnd = UnityEngine.Random;
 
-public class SimonSmothersScript : MonoBehaviour {
+public class SimonSmothersScript : MonoBehaviour
+{
 
     public KMBombInfo Bomb;
     public KMAudio Audio;
@@ -27,7 +28,7 @@ public class SimonSmothersScript : MonoBehaviour {
 
     private int stage;
     private bool pressedSubmitAlready;
-    List<int> buttonSounds = Enumerable.Range(1,4).ToList();
+    List<int> buttonSounds = Enumerable.Range(1, 4).ToList();
     int submitSound;
 
     private Pattern generatedPattern, inputtedPattern;
@@ -56,8 +57,10 @@ public class SimonSmothersScript : MonoBehaviour {
     static int moduleIdCounter = 1;
     int moduleId;
     private bool moduleSolved;
+    private bool moduleMarkedSolved;
 
-    void Awake () {
+    void Awake()
+    {
         moduleId = moduleIdCounter++;
 
         for (int i = 0; i < 5; i++)
@@ -67,7 +70,7 @@ public class SimonSmothersScript : MonoBehaviour {
         }
     }
 
-    void Start ()
+    void Start()
     {
         for (int i = 0; i < 5; i++)
             dirLights[i].range *= transform.lossyScale.x;
@@ -91,8 +94,8 @@ public class SimonSmothersScript : MonoBehaviour {
         if (position == 4)
             HandleSubmit();
         else
-            HandleDirectionPress((Dir)position);
-        
+            HandleDirectionPress((Dir) position);
+
     }
 
     void HandleSubmit()
@@ -150,6 +153,7 @@ public class SimonSmothersScript : MonoBehaviour {
         yield return new WaitForSecondsRealtime(3.456f);
         Audio.PlayGameSoundAtTransform(KMSoundOverride.SoundEffect.CorrectChime, transform);
         Module.HandlePass();
+        moduleMarkedSolved = true;
     }
     void Strike()
     {
@@ -177,8 +181,8 @@ public class SimonSmothersScript : MonoBehaviour {
         Pattern p;
         do
         {
-            generatedFlash = new Flash((Dir)Rnd.Range(0, 4), 
-                                (RGBColor)Rnd.Range(1, 7), 
+            generatedFlash = new Flash((Dir) Rnd.Range(0, 4),
+                                (RGBColor) Rnd.Range(1, 7),
                                 sideLengths[Bomb.GetSerialNumberNumbers().First() % 5][stage]);
             p = new Pattern();
             List<Flash> newFlashes = flashes.ToList();
@@ -186,7 +190,7 @@ public class SimonSmothersScript : MonoBehaviour {
             for (int flashIx = 0; flashIx < newFlashes.Count; flashIx++)
                 p.Add(
                     newFlashes[flashIx].associatedSquare
-                                    .Select(coord => coord.ApplyMovements( RotateDirections(newFlashes
+                                    .Select(coord => coord.ApplyMovements(RotateDirections(newFlashes
                                                                                                 .Select(fl => fl.direction)
                                                                                                 .Take(flashIx + 1)
                                                                                             , flashIx))));
@@ -219,7 +223,7 @@ public class SimonSmothersScript : MonoBehaviour {
 
     IEnumerable<Dir> RotateDirections(IEnumerable<Dir> initial, int rotationNum)
     {
-        return initial.Select(d => (Dir)(((int)d + rotationNum) % 4));
+        return initial.Select(d => (Dir) (((int) d + rotationNum) % 4));
     }
 
     IEnumerator FlashLight(Light light, float time, bool isButton, RGBColor? used = null)
@@ -243,10 +247,10 @@ public class SimonSmothersScript : MonoBehaviour {
                 bigLight.color = colorLookup[flashes[stage].color];
                 StartCoroutine(FlashLight(bigLight, 0.75f, false, flashes[stage].color));
                 goofyAhhText.text = flashes[stage].color.ToString().ToUpper() + "!";
-                StartCoroutine(FlashLight(dirLights[(int)flashes[stage].direction], 0.75f, true));
+                StartCoroutine(FlashLight(dirLights[(int) flashes[stage].direction], 0.75f, true));
                 if (cbOn)
                     StartCoroutine(FlashCBText(0.75f));
-                Audio.PlaySoundAtTransform("Sound" + ((int)flashes[stage].direction + 1), transform);
+                Audio.PlaySoundAtTransform("Sound" + ((int) flashes[stage].direction + 1), transform);
                 yield return new WaitForSeconds(1f);
             }
 
@@ -284,14 +288,14 @@ public class SimonSmothersScript : MonoBehaviour {
 
 #pragma warning disable 414
     private readonly string TwitchHelpMessage = @"Use <!{0} URDLS> to press the up, right, down, left, then submit button. Use <!{0} colorblind> to toggle colorblind mode.";
-    #pragma warning restore 414
+#pragma warning restore 414
 
     IEnumerator Press(KMSelectable btn, float delay)
     {
         btn.OnInteract();
         yield return new WaitForSeconds(delay);
     }
-    IEnumerator ProcessTwitchCommand (string command)
+    IEnumerator ProcessTwitchCommand(string command)
     {
         command = command.Trim().ToUpperInvariant();
         if (command.EqualsAny("COLORBLIND", "COLOURBLIND", "COLOR-BLIND", "COLOUR-BLIND", "CB"))
@@ -313,4 +317,73 @@ public class SimonSmothersScript : MonoBehaviour {
         }
     }
 
+    IEnumerator TwitchHandleForcedSolve()
+    {
+        while (anyActive && !thisActive)
+            yield return true;
+        var submit = buttons[4];
+        if (!thisActive)
+        {
+            submit.OnInteract();
+            yield return new WaitForSeconds(1f);
+        }
+        while (!moduleSolved)
+        {
+            // If the user has already inputted part of the pattern, then we give up and just mark the module as solved.
+            if (inputtedPattern.Skip(1).Any())
+            {
+                Module.HandlePass();
+                moduleSolved = true;
+                moduleMarkedSolved = true;
+                anyActive = false;
+                yield break;
+            }
+
+            var grid = generatedPattern.GetLoggingPattern(true).ToArray();
+            var width = grid[0].Length;
+            var height = grid.Length;
+            var path = findPath(grid, new int[0], width, height, grid.Sum(line => line.Count(ch => ch != '.'))).First();
+            for (var i = 1; i < path.Length; i++)
+            {
+                var dir = getDir(path[i - 1], path[i], width).Value;
+                if (grid[path[i] / width][path[i] % width] != grid[path[i - 1] / width][path[i - 1] % width])
+                {
+                    submit.OnInteract();
+                    yield return new WaitForSeconds(.2f);
+                }
+                buttons[(int) dir].OnInteract();
+                yield return new WaitForSeconds(.2f);
+            }
+            submit.OnInteract();
+            yield return new WaitForSeconds(.2f);
+            submit.OnInteract();
+            yield return new WaitForSeconds(1f);
+        }
+        while (!moduleMarkedSolved)
+            yield return true;
+    }
+
+    private IEnumerable<int[]> findPath(string[] grid, int[] already, int width, int height, int total)
+    {
+        if (already.Length == total)
+        {
+            yield return already;
+            yield break;
+        }
+
+        for (var i = 0; i < width * height; i++)
+            if (grid[i / width][i % width] != '.' && (already.Length == 0 || getDir(already.Last(), i, width) != null) && !already.Contains(i))
+            {
+                var newAlready = already.Concat(new[] { i }).ToArray();
+                foreach (var result in findPath(grid, newAlready, width, height, total))
+                    yield return result;
+            }
+    }
+
+    private Dir? getDir(int from, int to, int width)
+    {
+        return
+            from % width == to % width ? from / width + 1 == to / width ? Dir.Down : from / width - 1 == to / width ? Dir.Up : (Dir?) null :
+            from / width == to / width ? from % width + 1 == to % width ? Dir.Right : from % width - 1 == to % width ? Dir.Left : (Dir?) null : null;
+    }
 }
