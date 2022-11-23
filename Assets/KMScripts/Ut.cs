@@ -166,8 +166,6 @@ public static class Ut
     /// <exception cref="ArgumentOutOfRangeException"></exception>
     public static void SetComponent(this Vector3 vect, char component, float value)
     {
-        if (vect == null)
-            throw new ArgumentNullException("vect");
         switch (component)
         {
             case 'X':
